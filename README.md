@@ -58,12 +58,12 @@ sologsb-1118/
 │   ├── public/favicon.svg
 │   └── src/
 │       ├── types/              # trench.ts / stratum.ts / artifact.ts / relation.ts / index.ts
-│       ├── stores/             # trenchStore / stratumStore / artifactStore / relationStore（Zustand）
+│       ├── stores/             # trenchStore / stratumStore / artifactStore / relationStore / archiveStore（Zustand + Dexie）
 │       ├── components/common/  # StratumDepthBar / RelationGraph / TrenchTag / UnitPicker
 │       ├── hooks/              # useStratumOrder / useRelationGraph / usePersistentStore
 │       ├── pages/              # TrenchesPage / StrataPage / ArtifactsPage / RelationsPage / SectionsPage
 │       ├── router/index.ts
-│       └── utils/              # graph.ts / export.ts / id.ts
+│       └── utils/              # graph.ts / export.ts / archive.ts / id.ts
 ```
 
 ## 五、数据模型与存储
@@ -83,13 +83,22 @@ sologsb-1118/
 
 | 路由 | 功能 |
 | --- | --- |
-| `/trenches` | 探方清单：按「发掘区-探方号」校验唯一性，卡片显示单位数、出土物件数、关系数与发掘进度状态 |
+| `/trenches` | 探方清单：按「发掘区-探方号」校验唯一性，卡片显示单位数、出土物件数、关系数与发掘进度状态；支持单探方档案导出与带回并入 |
 | `/strata` | 地层单位编目表：按类型与深度区间筛选，层序倒置与单位号重复即时高亮，深度刻度条展示厚度 |
 | `/artifacts` | 出土物登记与清单：先锁定所属地层单位（级联选择器），带出深度区间并校验出土深度是否在该区间内 |
 | `/relations` | 层位关系视图：SVG 有向图展示叠压/打破，点击节点高亮直接关系，新增关系前做环路检测 |
 | `/sections` | 四壁剖面示意：按深度刻度绘制地层条带与厚度标注，叠加出土物投影点 |
 
-## 七、校验规则
+## 七、工地—整理室档案对传
+
+- **一个探方一份档案**：在探方卡片上导出 JSON，档案包含该探方、所属地层单位、单位内出土物及单位间层位关系；
+- **按单位号并地层单位**：同一单位号合并为一条，土质土色与包含物采用整理室带回稿，上界/下界深度保留工地量取值，深度不一致会列入报告复核；
+- **按单位号重挂关系**：档案内 ID 不作为合并依据，层位关系自动映射到工地单位；会造成两个单位互相叠压/打破的关系不写入并列入复核；
+- **按器物编号并出土物**：已有器物编号直接跳过，避免同一份档案重复导入；新出土物会重新生成本地 ID；
+- **重算与越界核对**：合并后按上界深度、下界深度和单位号重算序位，并检查所有出土物 Z 值是否仍落在所属单位区间，越界项列入报告；
+- **失败回滚**：合并方案通过 IndexedDB 单事务写入，写入中途失败会自动恢复合并前编目。
+
+## 八、校验规则
 
 - 同一「发掘区-探方号」只允许一个探方；
 - 同一探方内单位号不可重复（保存时拒绝）；

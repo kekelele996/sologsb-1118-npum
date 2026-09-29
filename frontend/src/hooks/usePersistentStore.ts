@@ -1,6 +1,7 @@
 import { onUnmounted, reactive } from 'vue'
 import type { StoreApi } from 'zustand/vanilla'
 import Dexie, { type Table } from 'dexie'
+import type { MergePlan } from '@/utils/archive'
 import type { Artifact, Relation, Stratum, Trench } from '@/types'
 
 /** IndexedDB 数据结构版本号 */
@@ -58,6 +59,15 @@ export const db = new TrenchLogDb()
 /** 写入当前数据结构版本号 */
 export async function stampDbVersion(): Promise<void> {
   await db.meta.put({ key: 'schemaVersion', value: SCHEMA_VERSION })
+}
+
+/** 原子写入合并方案；任一步失败时 IndexedDB 事务自动回滚到合并前的编目 */
+export async function applyMergePlan(plan: MergePlan): Promise<void> {
+  await db.transaction('rw', db.strata, db.artifacts, db.relations, async () => {
+    if (plan.strataToPut.length > 0) await db.strata.bulkPut(plan.strataToPut)
+    if (plan.artifactsToPut.length > 0) await db.artifacts.bulkPut(plan.artifactsToPut)
+    if (plan.relationsToPut.length > 0) await db.relations.bulkPut(plan.relationsToPut)
+  })
 }
 
 /** 读取整表 */
